@@ -1,4 +1,4 @@
-name: Lint
+name: Lint and Build
 
 on:
   push:
@@ -37,13 +37,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Set image tags
+      - name: Get short SHA
         id: vars
-        run: |
-          echo "SHA_TAG=$(echo ${{ github.event.workflow_run.head_sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "sha=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Docker Login
         uses: docker/login-action@v3
@@ -60,5 +57,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:${{ steps.vars.outputs.SHA_TAG }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:${{ steps.vars.outputs.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:latest
