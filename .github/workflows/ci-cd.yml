@@ -49,6 +49,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
           DEFAULT_BUMP: patch
+          DEFAULT_BRANCH: kartik
+
+      - name: Create Clean Tag Output
+        id: meta
+        run: |
+          CLEAN_TAG=$(echo "${{ steps.tag_version.outputs.new_tag }}" | sed 's/^v//')
+          echo "clean_tag=${CLEAN_TAG}" >> $GITHUB_OUTPUT
 
       - name: Convert repository name to lowercase
         run: |
@@ -78,3 +85,17 @@ jobs:
             ghcr.io/${{ env.REPO_LC }}:latest
             ghcr.io/${{ env.REPO_LC }}:${{ steps.tag_version.outputs.new_tag }}
             ghcr.io/${{ env.REPO_LC }}:${{ github.sha }}
+
+      - name: Build local image for archiving
+        run: |
+          docker build -t ghcr.io/${{ env.REPO_LC }}:${{ steps.tag_version.outputs.new_tag }} .
+          docker save -o local-flask-app-${{ steps.meta.outputs.clean_tag }}-image.tar ghcr.io/${{ env.REPO_LC }}:${{ steps.tag_version.outputs.new_tag }}
+
+      # Save the generated file before the temporary runner self-destructs
+      - name: Upload Container Tarball Archive to GitHub Storage
+        uses: actions/upload-artifact@v4
+        with:
+          name: flask-production-package-${{ steps.meta.outputs.clean_tag }}
+          # Path must match what the Makefile generates: [IMAGE_NAME]-[VERSION].tar
+          path: local-flask-app-${{ steps.meta.outputs.clean_tag }}-*.tar
+          retention-days: 7 # Kept for a week before auto-pruning to save cloud space
