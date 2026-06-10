@@ -1,2 +1,9 @@
 Flask==3.0.3
 gunicorn==22.0.0
+Flask-SQLAlchemy
+PyMySQL
+Flask-Bcrypt
+Flask-JWT-Extended
+Flask-Limiter
+Flask-WTF
+email-validator
