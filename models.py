@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 db = SQLAlchemy()
 
+
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -24,13 +25,14 @@ class User(db.Model):
             'username': self.username
         }
 
+
 class Message(db.Model):
     __tablename__ = 'messages'
 
     id = db.Column(db.Integer, primary_key=True)
     room = db.Column(db.String(100), nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
-    msg_type = db.Column(db.String(20), nullable=False, default='text') # text, image, voice
+    msg_type = db.Column(db.String(20), nullable=False, default='text')  # text, image, voice
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -47,13 +49,14 @@ class Message(db.Model):
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
 
+
 class Group(db.Model):
     __tablename__ = 'groups'
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
+
     # Relationship
     creator = db.relationship('User', backref=db.backref('created_groups', lazy=True))
 
@@ -63,6 +66,7 @@ class Group(db.Model):
             'name': self.name,
             'created_by': self.created_by
         }
+
 
 class GroupMember(db.Model):
     __tablename__ = 'group_members'
