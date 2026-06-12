@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatHeaderTitle = document.getElementById('chat-header-title');
     const chatStatusText = document.getElementById('chat-status-text');
     const logoutBtn = document.getElementById('logout-btn');
+    const searchBar = document.querySelector('.search-bar');
 
     let currentRoom = null;
     let ws = null;
@@ -132,15 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
             contentDiv.innerHTML = '';
             contentDiv.appendChild(img);
         } else if (msgData.msg_type === 'voice') {
-            // ===== PERSON 3: MEDIA FEATURES =====
-            const container = document.createElement('div');
-            container.className = 'voice-message-container';
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = msgData.content;
-            container.appendChild(audio);
-            contentDiv.innerHTML = '';
-            contentDiv.appendChild(container);
+            contentDiv.innerHTML = '<span style="color:var(--text-muted);font-style:italic;">[Voice message removed]</span>';
         }
         
         const timeSpan = document.createElement('span');
@@ -224,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const usersRes = await apiFetch('/api/users');
             if (usersRes.ok) {
                 const users = await usersRes.json();
+                allUsers = users;
                 usersList.innerHTML = '';
                 users.forEach(user => {
                     if (user.id === currentUser.id) return; // Skip self
@@ -292,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===== PERSON 3: MEDIA FEATURES =====
 
     const attachmentBtn = document.getElementById('attachment-btn');
-    const voiceBtn = document.getElementById('voice-btn');
     const mediaFileInput = document.getElementById('media-file-input');
     const lightboxModal = document.getElementById('lightbox-modal');
     const lightboxImg = document.getElementById('lightbox-img');
@@ -381,118 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Voice Recording Variables
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
-
-    // Press and Hold Voice Recording Handler
-    async function startRecording() {
-        if (!currentRoom) {
-            alert('Please select a chat first.');
-            return;
-        }
-
-        audioChunks = [];
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = async () => {
-                // Stop all tracks to release microphone
-                stream.getTracks().forEach(track => track.stop());
-
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                
-                // Client-side validation: must be webm, ogg, or mp3
-                const allowedMimes = ['audio/webm', 'audio/ogg', 'audio/mp3', 'audio/mpeg'];
-                if (audioBlob.type && !allowedMimes.some(mime => audioBlob.type.startsWith(mime) || mime === audioBlob.type)) {
-                    alert('Unsupported audio format.');
-                    return;
-                }
-
-                // Show progress indicator
-                const progressOverlay = document.createElement('div');
-                progressOverlay.className = 'upload-progress-overlay';
-                progressOverlay.innerHTML = `
-                    <div class="progress-spinner"></div>
-                    <div class="progress-text">Sending voice message...</div>
-                `;
-                document.querySelector('.chat-area').appendChild(progressOverlay);
-
-                const formData = new FormData();
-                formData.append('file', audioBlob, 'voice.webm');
-
-                try {
-                    const res = await fetch('/api/upload', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: formData
-                    });
-
-                    progressOverlay.remove();
-
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify({
-                                type: 'message',
-                                room: currentRoom,
-                                content: data.url,
-                                msg_type: 'voice',
-                                sender_id: currentUser.id
-                            }));
-                        }
-                    } else {
-                        const errData = await res.json();
-                        alert(`Voice upload failed: ${errData.error || 'Unknown error'}`);
-                    }
-                } catch (err) {
-                    progressOverlay.remove();
-                    console.error('Voice upload error:', err);
-                    alert('An error occurred during voice upload.');
-                }
-            };
-
-            mediaRecorder.start();
-            isRecording = true;
-            voiceBtn.classList.add('recording');
-        } catch (err) {
-            console.error('Failed to get user media for recording:', err);
-            alert('Could not access microphone. Please check permissions.');
-        }
-    }
-
-    function stopRecording() {
-        if (mediaRecorder && isRecording) {
-            mediaRecorder.stop();
-            isRecording = false;
-            voiceBtn.classList.remove('recording');
-        }
-    }
-
-    // Bind Mouse/Touch Events for voice recording
-    voiceBtn.addEventListener('mousedown', startRecording);
-    voiceBtn.addEventListener('mouseup', stopRecording);
-    voiceBtn.addEventListener('mouseleave', stopRecording);
-
-    voiceBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        startRecording();
-    });
-    voiceBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        stopRecording();
-    });
-
     // ===== PERSON 3: GROUPS UI =====
 
     const newGroupBtn = document.getElementById('new-group-btn');
@@ -509,6 +390,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const groupInfoName = document.getElementById('group-info-name');
     const groupMembersList = document.getElementById('group-members-list');
     const chatHeaderInfo = document.getElementById('chat-header-info');
+
+    const addMemberSelect = document.getElementById('add-member-select');
+    const addMemberSubmitBtn = document.getElementById('add-member-submit-btn');
 
     let allUsers = [];
 
@@ -622,6 +506,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const members = await res.json();
                 groupMembersList.innerHTML = '';
+                
+                if (addMemberSelect) {
+                    addMemberSelect.innerHTML = '<option value="">Select user...</option>';
+                    const memberIds = new Set(members.map(m => m.user_id));
+                    allUsers.forEach(user => {
+                        if (user.id !== currentUser.id && !memberIds.has(user.id)) {
+                            const opt = document.createElement('option');
+                            opt.value = user.id;
+                            opt.textContent = user.username;
+                            addMemberSelect.appendChild(opt);
+                        }
+                    });
+                }
+
                 members.forEach(member => {
                     const name = member.username || 'Unknown';
                     const div = document.createElement('div');
@@ -639,6 +537,33 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Failed to load group members:', err);
             groupMembersList.innerHTML = '<div style="font-size:0.85rem; color:#ef4444;">Error loading members.</div>';
         }
+    }
+
+    if (addMemberSubmitBtn) {
+        addMemberSubmitBtn.addEventListener('click', async () => {
+            const userId = addMemberSelect.value;
+            if (!userId) return;
+            const groupId = currentRoom.split('_')[1];
+
+            addMemberSubmitBtn.disabled = true;
+            try {
+                const res = await apiFetch(`/api/groups/${groupId}/members`, {
+                    method: 'POST',
+                    body: JSON.stringify({ user_id: parseInt(userId) })
+                });
+
+                if (res.ok) {
+                    loadGroupMembers(groupId);
+                } else {
+                    const errData = await res.json();
+                    alert(`Failed to add member: ${errData.error || 'Unknown error'}`);
+                }
+            } catch (err) {
+                console.error('Failed to add member:', err);
+            } finally {
+                addMemberSubmitBtn.disabled = false;
+            }
+        });
     }
 
     chatHeaderInfo.addEventListener('click', () => {
@@ -699,6 +624,20 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem('user');
         window.location.href = '/login';
     });
+
+    if (searchBar) {
+        searchBar.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.contact-item').forEach(item => {
+                const name = item.querySelector('.contact-name').textContent.toLowerCase();
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
 
     // Init
     loadSidebar();
