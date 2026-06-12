@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v1.0.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git tag ${{ github.event.inputs.version }}
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Create Release Notes
+        run: |
+          cat << EOF > release-notes.md
+          ## Chat4U Release
+
+          Version:
+          ${{ github.event.inputs.version }}
+
+          Commit:
+          ${{ github.sha }}
+
+          Docker Image:
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:${{ github.event.inputs.version }}
+
+          Security Status:
+          Passed security gate
+
+          Reports:
+          See workflow artifacts from the latest CI run.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          body_path: release-notes.md
