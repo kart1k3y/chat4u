@@ -6,4 +6,6 @@ venv/
 .env
 .idea/
 .vscode/
-*.db
+*.db\
+.secrets
+artifacts/
