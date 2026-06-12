@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get short SHA
+        id: vars
+        run: |
+          echo "sha=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Create Git Tag
         run: |
           git config user.name "github-actions"
@@ -41,10 +46,7 @@ jobs:
           ${{ github.sha }}
 
           Docker Image:
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:${{ github.event.inputs.version }}
-
-          Security Status:
-          Passed security gate
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/chat4u:${{ steps.vars.outputs.sha }}
 
           Reports:
           See workflow artifacts from the latest CI run.
