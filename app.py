@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template, redirect
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_limiter import Limiter
@@ -42,6 +42,22 @@ def create_app(config_class=Config):
 
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(groups_bp, url_prefix='/api')
+
+    @app.route('/')
+    def index():
+        return redirect('/login')
+
+    @app.route('/login')
+    def login_page():
+        return render_template('auth/login.html')
+
+    @app.route('/signup')
+    def signup_page():
+        return render_template('auth/signup.html')
+
+    @app.route('/chat')
+    def chat_page():
+        return render_template('chat.html')
 
     @app.route('/api/upload', methods=['POST'])
     def upload_file():

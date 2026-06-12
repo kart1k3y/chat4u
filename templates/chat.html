@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Chat4U</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+</head>
+<body>
+    <div class="background-glow"></div>
+    <div class="background-glow-left"></div>
+
+    <div class="app-container">
+        <!-- Sidebar Panel -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Chats</h2>
+                <input type="text" class="search-bar" placeholder="Search users or groups...">
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="section-title">Direct Messages</div>
+                <div id="users-list">
+                    <!-- Users injected here by chat.js -->
+                </div>
+
+                <div class="section-title" style="margin-top: 15px;">Groups</div>
+                <div id="groups-list">
+                    <!-- Groups injected here by chat.js -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area Panel -->
+        <div class="chat-area">
+            <!-- Header -->
+            <div class="chat-header">
+                <div class="header-info">
+                    <div class="header-text">
+                        <h1 id="chat-header-title">Select a chat</h1>
+                        <div class="status-container">
+                            <span class="status-text" id="chat-status-text">...</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="logout-btn" class="logout-btn">Logout</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-chat-selected" class="no-chat-selected">
+                <h2>Welcome to Chat4U</h2>
+                <p>Select a contact or group from the sidebar to start messaging</p>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages injected here by chat.js -->
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-area">
+                <button class="attachment-btn" title="Attach file">📎</button>
+                <div class="input-wrapper">
+                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                </div>
+                <button class="voice-btn" title="Record voice">🎤</button>
+                <button id="send-btn" class="send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>
