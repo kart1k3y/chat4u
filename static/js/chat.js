@@ -116,11 +116,31 @@ document.addEventListener('DOMContentLoaded', () => {
             // Render text
             contentDiv.innerHTML = linkify(escapeHTML(msgData.content));
         } else if (msgData.msg_type === 'image') {
-            // HOOK: Person 3 will add image rendering here (msg_type === 'image')
-            contentDiv.innerHTML = `<em>[Image attached] ${linkify(escapeHTML(msgData.content))}</em>`;
+            // ===== PERSON 3: MEDIA FEATURES =====
+            const img = document.createElement('img');
+            img.src = msgData.content;
+            img.className = 'chat-image';
+            img.alt = 'Image message';
+            img.addEventListener('click', () => {
+                const lightboxModal = document.getElementById('lightbox-modal');
+                const lightboxImg = document.getElementById('lightbox-img');
+                const lightboxCaption = document.getElementById('lightbox-caption');
+                lightboxImg.src = msgData.content;
+                lightboxCaption.textContent = `Sent by ${isSentByMe ? 'Me' : 'User'}`;
+                lightboxModal.classList.add('active');
+            });
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(img);
         } else if (msgData.msg_type === 'voice') {
-            // HOOK: Person 3 will add voice rendering here (msg_type === 'voice')
-            contentDiv.innerHTML = `<em>[Voice message attached]</em>`;
+            // ===== PERSON 3: MEDIA FEATURES =====
+            const container = document.createElement('div');
+            container.className = 'voice-message-container';
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = msgData.content;
+            container.appendChild(audio);
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(container);
         }
         
         const timeSpan = document.createElement('span');
@@ -268,6 +288,394 @@ document.addEventListener('DOMContentLoaded', () => {
             chatInput.focus();
         }
     }
+
+    // ===== PERSON 3: MEDIA FEATURES =====
+
+    const attachmentBtn = document.getElementById('attachment-btn');
+    const voiceBtn = document.getElementById('voice-btn');
+    const mediaFileInput = document.getElementById('media-file-input');
+    const lightboxModal = document.getElementById('lightbox-modal');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const closeLightbox = document.getElementById('close-lightbox');
+
+    // Image Upload Click Trigger
+    attachmentBtn.addEventListener('click', () => {
+        if (!currentRoom) {
+            alert('Please select a chat first.');
+            return;
+        }
+        mediaFileInput.click();
+    });
+
+    // Handle Image Selection and Upload
+    mediaFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Client-side validation: mime type and extension
+        const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        const allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        if (!allowedMimeTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+            alert('Invalid file type. Only PNG, JPG, GIF, and WEBP images are allowed.');
+            mediaFileInput.value = '';
+            return;
+        }
+
+        // Show upload progress indicator
+        const progressOverlay = document.createElement('div');
+        progressOverlay.className = 'upload-progress-overlay';
+        progressOverlay.innerHTML = `
+            <div class="progress-spinner"></div>
+            <div class="progress-text">Uploading image...</div>
+        `;
+        document.querySelector('.chat-area').appendChild(progressOverlay);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            progressOverlay.remove();
+            mediaFileInput.value = '';
+
+            if (res.ok) {
+                const data = await res.json();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'message',
+                        room: currentRoom,
+                        content: data.url,
+                        msg_type: 'image',
+                        sender_id: currentUser.id
+                    }));
+                }
+            } else {
+                const errData = await res.json();
+                alert(`Upload failed: ${errData.error || 'Unknown error'}`);
+            }
+        } catch (err) {
+            progressOverlay.remove();
+            mediaFileInput.value = '';
+            console.error('Image upload error:', err);
+            alert('An error occurred during file upload.');
+        }
+    });
+
+    // Lightbox Close Handlers
+    closeLightbox.addEventListener('click', () => {
+        lightboxModal.classList.remove('active');
+    });
+
+    lightboxModal.addEventListener('click', (e) => {
+        if (e.target === lightboxModal) {
+            lightboxModal.classList.remove('active');
+        }
+    });
+
+    // Voice Recording Variables
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // Press and Hold Voice Recording Handler
+    async function startRecording() {
+        if (!currentRoom) {
+            alert('Please select a chat first.');
+            return;
+        }
+
+        audioChunks = [];
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                // Stop all tracks to release microphone
+                stream.getTracks().forEach(track => track.stop());
+
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                
+                // Client-side validation: must be webm, ogg, or mp3
+                const allowedMimes = ['audio/webm', 'audio/ogg', 'audio/mp3', 'audio/mpeg'];
+                if (audioBlob.type && !allowedMimes.some(mime => audioBlob.type.startsWith(mime) || mime === audioBlob.type)) {
+                    alert('Unsupported audio format.');
+                    return;
+                }
+
+                // Show progress indicator
+                const progressOverlay = document.createElement('div');
+                progressOverlay.className = 'upload-progress-overlay';
+                progressOverlay.innerHTML = `
+                    <div class="progress-spinner"></div>
+                    <div class="progress-text">Sending voice message...</div>
+                `;
+                document.querySelector('.chat-area').appendChild(progressOverlay);
+
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'voice.webm');
+
+                try {
+                    const res = await fetch('/api/upload', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+
+                    progressOverlay.remove();
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'message',
+                                room: currentRoom,
+                                content: data.url,
+                                msg_type: 'voice',
+                                sender_id: currentUser.id
+                            }));
+                        }
+                    } else {
+                        const errData = await res.json();
+                        alert(`Voice upload failed: ${errData.error || 'Unknown error'}`);
+                    }
+                } catch (err) {
+                    progressOverlay.remove();
+                    console.error('Voice upload error:', err);
+                    alert('An error occurred during voice upload.');
+                }
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+        } catch (err) {
+            console.error('Failed to get user media for recording:', err);
+            alert('Could not access microphone. Please check permissions.');
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            voiceBtn.classList.remove('recording');
+        }
+    }
+
+    // Bind Mouse/Touch Events for voice recording
+    voiceBtn.addEventListener('mousedown', startRecording);
+    voiceBtn.addEventListener('mouseup', stopRecording);
+    voiceBtn.addEventListener('mouseleave', stopRecording);
+
+    voiceBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startRecording();
+    });
+    voiceBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        stopRecording();
+    });
+
+    // ===== PERSON 3: GROUPS UI =====
+
+    const newGroupBtn = document.getElementById('new-group-btn');
+    const groupModal = document.getElementById('group-modal');
+    const closeGroupModal = document.getElementById('close-group-modal');
+    const cancelGroupBtn = document.getElementById('cancel-group-btn');
+    const submitGroupBtn = document.getElementById('submit-group-btn');
+    const groupNameInput = document.getElementById('group-name-input');
+    const memberSearchInput = document.getElementById('member-search-input');
+    const memberSelectList = document.getElementById('member-select-list');
+
+    const groupInfoPanel = document.getElementById('group-info-panel');
+    const closeGroupInfoBtn = document.getElementById('close-group-info-btn');
+    const groupInfoName = document.getElementById('group-info-name');
+    const groupMembersList = document.getElementById('group-members-list');
+    const chatHeaderInfo = document.getElementById('chat-header-info');
+
+    let allUsers = [];
+
+    // Open Create Group Modal
+    newGroupBtn.addEventListener('click', async () => {
+        groupNameInput.value = '';
+        memberSearchInput.value = '';
+        memberSelectList.innerHTML = '<div class="progress-text" style="text-align: center;">Loading users...</div>';
+        groupModal.classList.add('active');
+
+        try {
+            const res = await apiFetch('/api/users');
+            if (res.ok) {
+                allUsers = await res.json();
+                renderMemberList();
+            } else {
+                memberSelectList.innerHTML = '<div class="progress-text" style="color: #ef4444;">Failed to load users.</div>';
+            }
+        } catch (err) {
+            console.error('Failed to fetch users:', err);
+            memberSelectList.innerHTML = '<div class="progress-text" style="color: #ef4444;">Failed to load users.</div>';
+        }
+    });
+
+    // Render users with checkboxes in the Create Group Modal
+    function renderMemberList(filterText = '') {
+        memberSelectList.innerHTML = '';
+        const query = filterText.toLowerCase();
+
+        allUsers.forEach(user => {
+            if (user.id === currentUser.id) return; // Skip self
+            if (query && !user.username.toLowerCase().includes(query)) return;
+
+            const div = document.createElement('label');
+            div.className = 'member-select-item';
+            div.innerHTML = `
+                <input type="checkbox" value="${user.id}" data-username="${escapeHTML(user.username)}">
+                <span class="member-select-name">${escapeHTML(user.username)}</span>
+            `;
+            memberSelectList.appendChild(div);
+        });
+
+        if (memberSelectList.children.length === 0) {
+            memberSelectList.innerHTML = '<div class="progress-text" style="text-align: center;">No users found.</div>';
+        }
+    }
+
+    // Modal Search Filter Listener
+    memberSearchInput.addEventListener('input', (e) => {
+        renderMemberList(e.target.value);
+    });
+
+    // Close Modals
+    function closeGroupCreationModal() {
+        groupModal.classList.remove('active');
+    }
+
+    closeGroupModal.addEventListener('click', closeGroupCreationModal);
+    cancelGroupBtn.addEventListener('click', closeGroupCreationModal);
+
+    groupModal.addEventListener('click', (e) => {
+        if (e.target === groupModal) {
+            closeGroupCreationModal();
+        }
+    });
+
+    // Submit Group Creation
+    submitGroupBtn.addEventListener('click', async () => {
+        const name = groupNameInput.value.trim();
+        if (!name) {
+            alert('Group name is required.');
+            return;
+        }
+
+        const selectedCheckboxes = memberSelectList.querySelectorAll('input[type="checkbox"]:checked');
+        const member_ids = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
+
+        // Submit to API
+        try {
+            const res = await apiFetch('/api/groups', {
+                method: 'POST',
+                body: JSON.stringify({ name, member_ids })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                closeGroupCreationModal();
+                
+                // Reload sidebar to show the new group
+                await loadSidebar();
+
+                const room = `group_${data.group.id}`;
+                
+                // Join the room locally and select it
+                selectRoom(room, data.group.name);
+            } else {
+                const errData = await res.json();
+                alert(`Failed to create group: ${errData.error || 'Unknown error'}`);
+            }
+        } catch (err) {
+            console.error('Group creation error:', err);
+            alert('An error occurred while creating the group.');
+        }
+    });
+
+    // Toggle Group Info Side Panel
+    async function loadGroupMembers(groupId) {
+        groupMembersList.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted);">Loading members...</div>';
+        try {
+            const res = await apiFetch(`/api/groups/${groupId}/members`);
+            if (res.ok) {
+                const members = await res.json();
+                groupMembersList.innerHTML = '';
+                members.forEach(member => {
+                    const name = member.username || 'Unknown';
+                    const div = document.createElement('div');
+                    div.className = 'member-item';
+                    div.innerHTML = `
+                        <div class="member-avatar">${name.charAt(0).toUpperCase()}</div>
+                        <div class="member-name">${escapeHTML(name)}</div>
+                    `;
+                    groupMembersList.appendChild(div);
+                });
+            } else {
+                groupMembersList.innerHTML = '<div style="font-size:0.85rem; color:#ef4444;">Failed to load members.</div>';
+            }
+        } catch (err) {
+            console.error('Failed to load group members:', err);
+            groupMembersList.innerHTML = '<div style="font-size:0.85rem; color:#ef4444;">Error loading members.</div>';
+        }
+    }
+
+    chatHeaderInfo.addEventListener('click', () => {
+        if (!currentRoom || !currentRoom.startsWith('group_')) {
+            // Only toggle for groups
+            groupInfoPanel.classList.remove('active');
+            return;
+        }
+
+        const active = groupInfoPanel.classList.toggle('active');
+        if (active) {
+            const groupId = currentRoom.split('_')[1];
+            groupInfoName.textContent = chatHeaderTitle.textContent;
+            loadGroupMembers(groupId);
+        }
+    });
+
+    closeGroupInfoBtn.addEventListener('click', () => {
+        groupInfoPanel.classList.remove('active');
+    });
+
+    // Update selectRoom to also update or close the group info panel
+    const originalSelectRoom = selectRoom;
+    selectRoom = function(roomId, title) {
+        originalSelectRoom(roomId, title);
+        
+        // Hide panel if not a group, or update it if already open
+        if (roomId.startsWith('group_')) {
+            if (groupInfoPanel.classList.contains('active')) {
+                const groupId = roomId.split('_')[1];
+                groupInfoName.textContent = title;
+                loadGroupMembers(groupId);
+            }
+        } else {
+            groupInfoPanel.classList.remove('active');
+        }
+    };
 
     // Events
     sendBtn.addEventListener('click', sendMessage);
