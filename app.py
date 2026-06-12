@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request, jsonify
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
@@ -21,6 +22,10 @@ limiter = Limiter(
 
 # Register Blueprints
 app.register_blueprint(auth_bp)
+
+@app.context_processor
+def inject_app_name():
+    return dict(app_name=os.getenv('APP_NAME', 'Chat4U'))
 
 with app.app_context():
     db.create_all()
@@ -77,6 +82,7 @@ def chat():
         response = f"I received your message: '{message}'. This template is fully interactive!"
         
     return jsonify({'response': response})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
