@@ -4,56 +4,95 @@
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0.3-lightgrey?logo=flask)](https://flask.palletsprojects.com/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker)](https://www.docker.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Flask-based interactive chatbot assistant built as a cloud-native, end-to-end **DevSecOps pipeline demonstration** for Capstone #C06. Chat4U covers containerization, automated CI/CD, Kubernetes orchestration, and observability with Prometheus and Grafana.
+Chat4U is a real-time, WhatsApp-like messenger web application designed as the target application for a college **DevSecOps Capstone Project (CAPSTONE #C06)**. 
+
+The primary deliverable of this project is the DevSecOps pipeline wrapped around the application, which performs automated security scans (static analysis, dependency checking, container scanning, and dynamic penetration testing) and blocks builds if vulnerabilities are detected.
 
 ---
 
 ## Table of Contents
 
-- [About](#about)
+- [About & Architecture](#about--architecture)
 - [Tech Stack](#tech-stack)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Running with Docker](#running-with-docker)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Project Status](#project-status)
+- [Key Features](#key-features)
+- [DevSecOps Security Pipeline](#devsecops-security-pipeline)
+- [Team Split & Deliverables](#team-split--deliverables)
+- [Installation & Running Locally](#installation--running-locally)
+  - [Prerequisites](#prerequisites)
+  - [Option 1: Using Docker Compose (Recommended)](#option-1-using-docker-compose-recommended)
+  - [Option 2: Native Run (Without Docker)](#option-2-native-run-without-docker)
+- [API Contracts Reference](#api-contracts-reference)
 
 ---
 
-## About
+## About & Architecture
 
-Chat4U is a web-based assistant that responds to user messages about GitHub Actions, Docker, and Semantic Versioning. It demonstrates how a simple Python web app can be containerized, continuously integrated, security-scanned, and released automatically using modern DevOps tooling.
+Chat4U supports real-time text chat, group creation, image uploading, and voice note sharing. It is built to present realistic security risks (JWT authentication, WebSockets, file uploads, potential XSS, and path-traversal surfaces) so that security scanners have realistic vulnerability vectors to evaluate.
+
+- **Authentication**: JWT-based session security (token stored in local storage).
+- **Real-Time Communication**: Multi-room WebSockets server (`flask-sock` over Gunicorn gthreads).
+- **Data Persistence**: PostgreSQL database storing user, message, group, and membership records.
+- **Media Storage**: File uploads are processed via REST and stored in `static/uploads/`, with URLs broadcasted to active room sessions.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
+| Component | Technology |
 |---|---|
-| Backend | Python 3.11, Flask 3.0.3, Gunicorn |
-| Containerization | Docker, Docker Desktop |
-| CI/CD | GitHub Actions, Flake8, Docker Buildx |
-| Registry | Docker Hub (Semantic Versioning + SHA tags) |
-| Security Scanning | Bandit, Snyk, Trivy, OWASP ZAP *(Capstone C06)* |
-| Orchestration | Kubernetes *(Phase 2)* |
-| Monitoring | Prometheus, Grafana *(Phase 3)* |
+| **Backend** | Python 3.11, Flask 3.0.3, Flask-Sock (WebSockets), Gunicorn |
+| **Frontend** | Vanilla HTML5, CSS3, ES6 JavaScript (No frameworks) |
+| **Database** | PostgreSQL 15 |
+| **Containerization** | Docker, Docker Compose |
+| **DevSecOps Pipeline** | GitHub Actions, Bandit, Snyk, Trivy, OWASP ZAP |
 
 ---
 
-## Installation
+## Key Features
+
+1. **Authentication**: Sleek signup and login panels, hashing passwords securely via `werkzeug.security`.
+2. **Text Messaging**: Real-time DM messaging between users over a single persistent WebSocket connection.
+3. **Group Chats**: Create groups with searchable member checklists. Selecting a group loads membership information and enables multi-user group chat rooms.
+4. **Media Sharing**: 
+   - **Images**: Upload PNG, JPEG, GIF, and WEBP formats client-side with upload progress indicators. Click to expand images in a dark full-screen Lightbox overlay.
+   - **Voice Notes**: Record audio notes via browser `MediaRecorder` API by holding down the microphone button, then play them back using inline audio elements.
+5. **Group Info Side Panel**: A slide-out details panel displaying usernames of all members in the current active group.
+
+---
+
+## DevSecOps Security Pipeline
+
+The application code is automatically scanned on every commit and Pull Request. The pipeline runs the following security suite:
+
+* **Bandit**: Static Application Security Testing (SAST) scanning Python code for insecure code blocks (e.g. `debug=True`, weak hashes, shell injection).
+* **Snyk**: Software Composition Analysis (SCA) checking the `requirements.txt` file for known dependency vulnerabilities.
+* **Trivy**: Container security scanner assessing the built Docker image for OS package and layer CVEs.
+* **OWASP ZAP**: Dynamic Application Security Testing (DAST) executing simulated web attacks (SQLi, XSS, CSRF) on a live running instance of the application.
+
+---
+
+## Team Split & Deliverables
+
+- **Person 1 (Backend)**: Core Flask framework setup, WebSockets backend server, database schemas, REST APIs, and Docker configurations.
+- **Person 2 (Frontend Shell)**: Auth views (signup/login), 3-panel message UI layout, WebSockets client, and text message state.
+- **Person 3 (Media & Groups)**: Image attachment uploads, voice recording, Lightbox overlay, Create Group modal, and Group Members Info sidebar.
+- **Person 4 (DevSecOps Pipeline)**: GitHub Actions integration, security scanner rulesets, vulnerability thresholds, and pipeline build gatekeepers.
+
+---
+
+## Installation & Running Locally
 
 ### Prerequisites
 
-- Python `>= 3.11`
-- `pip`
-- Docker Desktop *(for containerized runs)*
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+- (Optional) Python `3.11+` and PostgreSQL if running natively.
 
-### Steps
+### Option 1: Using Docker Compose (Recommended)
+
+This compiles the Flask application, installs PostgreSQL 15, configures the environment variables, runs migrations, and spawns the web application on port `5000` automatically.
 
 1. **Clone the repository**:
    ```bash
@@ -61,129 +100,38 @@ Chat4U is a web-based assistant that responds to user messages about GitHub Acti
    cd chat4u
    ```
 
-2. **Create and activate a virtual environment**:
+2. **Start the services**:
    ```bash
-   python -m venv venv
-
-   # Windows
-   venv\Scripts\activate
-
-   # macOS / Linux
-   source venv/bin/activate
+   docker-compose up --build -d
    ```
 
-3. **Install dependencies**:
+3. **Check the application**:
+   Open your browser and navigate to **[http://localhost:5000](http://localhost:5000)**.
+
+4. **Stop the services**:
+   ```bash
+   docker-compose down
+   ```
+
+### Option 2: Native Run (Without Docker)
+
+1. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   venv\Scripts\activate  # Windows
+   source venv/bin/activate  # macOS/Linux
+   ```
+2. Install packages:
    ```bash
    pip install -r requirements.txt
    ```
+3. Set environment variables (refer to `.env.example`) and start the application:
+   ```bash
+   python app.py
+   ```
 
 ---
 
-## Usage
+## API Contracts Reference
 
-Start the application locally:
-
-```bash
-python app.py
-```
-
-Open your browser and navigate to:
-
-```
-http://localhost:5000
-```
-
-Type a message in the chat input to interact with the assistant. It responds to topics like **Docker**, **GitHub Actions**, **Semantic Versioning**, and more.
-
----
-
-## Running with Docker
-
-### CLI
-
-```bash
-# Build the image
-docker build -t chat4u .
-
-# Run the container
-docker run -d -p 5000:5000 --name chat4u-app chat4u
-```
-
-Then visit `http://localhost:5000` in your browser.
-
-### Docker Desktop (GUI)
-
-1. Open **Docker Desktop** and go to the **Images** tab.
-2. Find the `chat4u` image and click the **Run** button.
-3. Under **Optional settings**, set:
-   - **Host port**: `5000`
-   - **Container name**: `chat4u-app`
-4. Click **Run** and click the port link to open the app in your browser.
-
----
-
-## CI/CD Pipeline
-
-The pipeline is defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
-
-| Job | Trigger | Description |
-|---|---|---|
-| `lint` | Every push and PR | Runs `flake8` with `pip` caching |
-| `docker-build-push` | Push to `main` or `v*.*.*` tag | Builds image, tags with SHA and SemVer, pushes to Docker Hub |
-| `github-release` | Push of `v*.*.*` tag | Auto-generates GitHub Release with changelog |
-
-### Required Secrets
-
-Add these under **Settings > Secrets and variables > Actions**:
-
-| Secret | Description |
-|---|---|
-| `DOCKER_USERNAME` | Your Docker Hub username |
-| `DOCKER_PASSWORD` | Your Docker Hub access token |
-| `SNYK_TOKEN` | Your Snyk API token (for security scanning) |
-
-### Creating a Release
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-This triggers the full pipeline: lints the code, builds and pushes the Docker image, and creates a versioned GitHub Release automatically.
-
----
-
-## Roadmap
-
-- [x] **Phase 1** — CI/CD Pipeline with Docker (containerize, lint, build, tag, release)
-- [ ] **Phase 2** — Kubernetes Orchestration (deployments, services, ingress, scaling)
-- [ ] **Phase 3** — Observability with Prometheus and Grafana (metrics, dashboards)
-- [ ] **Capstone #C06** — Full DevSecOps scanning (Bandit, Snyk, Trivy, OWASP ZAP)
-
----
-
-## Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/your-feature`.
-3. Commit your changes: `git commit -m 'feat: add your feature'`.
-4. Push to the branch: `git push origin feature/your-feature`.
-5. Open a Pull Request.
-
-Please ensure your code passes the `flake8` linter before submitting a PR.
-
----
-
-## License
-
-Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
-
----
-
-## Project Status
-
-**Phase 1 - Active Development**
-
-The CI/CD pipeline with Docker is fully operational. Phase 2 (Kubernetes) and Phase 3 (Monitoring) are planned for future sprints.
+All communication follows the fixed schema documented in `contracts.md` at the root of the repository. Do not deviate from these patterns when integrating frontend and backend features.
