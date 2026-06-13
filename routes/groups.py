@@ -13,7 +13,7 @@ def create_group():
     if not data or not data.get('name'):
         return jsonify({"error": "Group name is required"}), 400
 
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
 
     new_group = Group(name=data['name'], created_by=current_user_id)
     db.session.add(new_group)
@@ -22,6 +22,25 @@ def create_group():
     # Add creator as a member
     member = GroupMember(group_id=new_group.id, user_id=current_user_id)
     db.session.add(member)
+
+    # Add other members if provided
+    member_ids = data.get('member_ids', [])
+    for user_id in member_ids:
+        try:
+            uid = int(user_id)
+        except (ValueError, TypeError):
+            continue
+        if uid == current_user_id:
+            continue
+        # Check if user exists
+        user_exists = User.query.get(uid)
+        if user_exists:
+            # Check for duplicate
+            existing_member = GroupMember.query.filter_by(group_id=new_group.id, user_id=uid).first()
+            if not existing_member:
+                new_member = GroupMember(group_id=new_group.id, user_id=uid)
+                db.session.add(new_member)
+
     db.session.commit()
 
     return jsonify({"message": "Group created successfully", "group": new_group.to_dict()}), 201
@@ -30,7 +49,7 @@ def create_group():
 @groups_bp.route('/groups', methods=['GET'])
 @jwt_required()
 def get_my_groups():
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
 
     memberships = GroupMember.query.filter_by(user_id=current_user_id).all()
     groups = [m.group.to_dict() for m in memberships if m.group]
