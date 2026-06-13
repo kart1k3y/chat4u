@@ -7,7 +7,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Chat4U is a real-time, WhatsApp-like messenger web application designed as the target application for a college **DevSecOps Capstone Project (CAPSTONE #C06)**. 
+Chat4U is a real-time, a messenger web application designed as the target application for a college **DevSecOps Capstone Project (CAPSTONE #C06)**. 
 
 The primary deliverable of this project is the DevSecOps pipeline wrapped around the application, which performs automated security scans (static analysis, dependency checking, container scanning, and dynamic penetration testing) and blocks builds if vulnerabilities are detected.
 
